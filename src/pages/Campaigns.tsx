@@ -1,9 +1,34 @@
+import { useState } from 'react'
 import { useCampaigns } from '@/hooks/useCampaignData'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, RefreshCw, Loader2 } from 'lucide-react'
+import { SyncService } from '@/services/sync-service'
 
 export default function Campaigns() {
-  const { data: campaigns, isLoading, error } = useCampaigns()
+  const { data: campaigns, isLoading, error, refetch } = useCampaigns()
+  const [syncing, setSyncing] = useState(false)
+  const [syncError, setSyncError] = useState('')
+  const [syncSuccess, setSyncSuccess] = useState('')
+
+  const handleSync = async () => {
+    setSyncing(true)
+    setSyncError('')
+    setSyncSuccess('')
+
+    try {
+      const result = await SyncService.syncAllCampaigns()
+      if (result.success) {
+        setSyncSuccess(result.message || 'Campanhas sincronizadas com sucesso!')
+        refetch()
+      } else {
+        setSyncError(result.error || 'Erro ao sincronizar')
+      }
+    } catch (err) {
+      setSyncError(String(err))
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -24,10 +49,44 @@ export default function Campaigns() {
 
   return (
     <div className="space-y-6">
+      {syncError && (
+        <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+          <p className="text-sm text-red-600">{syncError}</p>
+        </div>
+      )}
+
+      {syncSuccess && (
+        <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-sm text-green-600">✅ {syncSuccess}</p>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
-          <CardTitle>Todas as Campanhas</CardTitle>
-          <CardDescription>Gerencie e acompanhe suas campanhas de Meta Ads e Google Ads</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Todas as Campanhas</CardTitle>
+              <CardDescription>Gerencie e acompanhe suas campanhas de Meta Ads e Google Ads</CardDescription>
+            </div>
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {syncing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Sincronizando...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  Sincronizar Campanhas
+                </>
+              )}
+            </button>
+          </div>
         </CardHeader>
         <CardContent>
           {campaigns && campaigns.length > 0 ? (
