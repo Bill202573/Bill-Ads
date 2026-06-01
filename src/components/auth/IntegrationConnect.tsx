@@ -203,7 +203,7 @@ export default function IntegrationConnect({ onConnected }: IntegrationConnectPr
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Obtenha em: Meta App > Marketing API > Tools
+                  Obtenha em: Meta App &gt; Marketing API &gt; Tools
                 </p>
               </div>
               <div className="flex gap-2">
@@ -245,7 +245,7 @@ export default function IntegrationConnect({ onConnected }: IntegrationConnectPr
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Obtenha em: Google Cloud Console > OAuth 2.0
+                  Obtenha em: Google Cloud Console &gt; OAuth 2.0
                 </p>
               </div>
               <div>
