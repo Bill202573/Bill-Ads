@@ -11,7 +11,7 @@ export class ClaudeInsightsService {
   private apiKey: string;
   private model: string = 'claude-opus-4-8';
 
-  constructor(apiKey: string = import.meta.env.REACT_APP_CLAUDE_API_KEY || '') {
+  constructor(apiKey: string = import.meta.env.VITE_CLAUDE_API_KEY || '') {
     this.apiKey = apiKey;
   }
 
