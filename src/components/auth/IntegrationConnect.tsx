@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/services/supabase-service'
 import { MetaAdsService } from '@/services/meta-ads-service'
 import { GoogleAdsService } from '@/services/google-ads-service'
+import { SyncService } from '@/services/sync-service'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
+import { AlertCircle, Loader2, CheckCircle2, Trash2, RefreshCw } from 'lucide-react'
 
 interface Integration {
   id: string
@@ -26,6 +27,8 @@ export default function IntegrationConnect({ onConnected }: IntegrationConnectPr
   const [metaToken, setMetaToken] = useState('')
   const [googleToken, setGoogleToken] = useState('')
   const [googleCustomerId, setGoogleCustomerId] = useState('')
+  const [syncingId, setSyncingId] = useState<string | null>(null)
+  const [syncMessage, setSyncMessage] = useState('')
 
   const loadIntegrations = async () => {
     try {
@@ -40,6 +43,37 @@ export default function IntegrationConnect({ onConnected }: IntegrationConnectPr
       setIntegrations(data || [])
     } catch (err) {
       console.error('Error loading integrations:', err)
+    }
+  }
+
+  const handleSyncIntegration = async (integrationId: string) => {
+    setSyncingId(integrationId)
+    setSyncMessage('')
+
+    try {
+      const result = await SyncService.syncIntegrationCampaigns(integrationId)
+      if (result.success) {
+        setSyncMessage(result.message || 'Campanhas sincronizadas!')
+      } else {
+        setSyncMessage(`Erro: ${result.error}`)
+      }
+    } catch (err) {
+      setSyncMessage(`Erro: ${String(err)}`)
+    } finally {
+      setSyncingId(null)
+    }
+  }
+
+  const handleDisconnect = async (integrationId: string) => {
+    if (!confirm('Tem certeza que deseja desconectar essa integração?')) {
+      return
+    }
+
+    try {
+      await supabase.from('integrations').delete().eq('id', integrationId)
+      await loadIntegrations()
+    } catch (err) {
+      setError('Erro ao desconectar: ' + String(err))
     }
   }
 
@@ -146,23 +180,65 @@ export default function IntegrationConnect({ onConnected }: IntegrationConnectPr
             Suas contas de Meta Ads e Google Ads
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {syncMessage && (
+            <div className={`p-3 rounded-lg text-sm ${
+              syncMessage.includes('Erro')
+                ? 'bg-red-50 border border-red-200 text-red-600'
+                : 'bg-green-50 border border-green-200 text-green-600'
+            }`}>
+              {syncMessage}
+            </div>
+          )}
+
           {integrations.length > 0 ? (
             <div className="space-y-3">
               {integrations.map(integration => (
-                <div key={integration.id} className="flex items-center justify-between p-3 border border-green-200 bg-green-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    <div>
-                      <p className="font-medium">
-                        {integration.platform === 'meta' ? 'Meta Ads' : 'Google Ads'}
-                      </p>
-                      <p className="text-sm text-gray-600">{integration.platform_account_name}</p>
+                <div key={integration.id} className="p-4 border border-green-200 bg-green-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="font-medium">
+                          {integration.platform === 'meta' ? '📱 Meta Ads' : '🔍 Google Ads'}
+                        </p>
+                        <p className="text-sm text-gray-600">{integration.platform_account_name}</p>
+                        <p className="text-xs text-gray-500 mt-1">ID: {integration.platform_account_id}</p>
+                      </div>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    {integration.last_sync ? new Date(integration.last_sync).toLocaleDateString() : 'Nunca'}
-                  </p>
+
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-500">
+                      Última sincronização: {integration.last_sync ? new Date(integration.last_sync).toLocaleDateString('pt-BR') : 'Nunca'}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleSyncIntegration(integration.id)}
+                        disabled={syncingId === integration.id}
+                        className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
+                      >
+                        {syncingId === integration.id ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Sincronizando...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-3 h-3" />
+                            Sincronizar
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleDisconnect(integration.id)}
+                        className="flex items-center gap-1 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Desconectar
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
