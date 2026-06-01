@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/services/supabase-service'
 import { MetaAdsService } from '@/services/meta-ads-service'
 import { GoogleAdsService } from '@/services/google-ads-service'
@@ -42,6 +42,10 @@ export default function IntegrationConnect({ onConnected }: IntegrationConnectPr
       console.error('Error loading integrations:', err)
     }
   }
+
+  useEffect(() => {
+    loadIntegrations()
+  }, [])
 
   const connectMeta = async () => {
     setLoading(true)
