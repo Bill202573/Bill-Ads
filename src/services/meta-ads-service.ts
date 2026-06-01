@@ -1,7 +1,7 @@
 import { Integration, Campaign, DailyMetrics, APIResponse } from '@/types/ads';
 
 const META_GRAPH_API_VERSION = 'v19.0';
-const META_BASE_URL = 'https://graph.instagram.com';
+const META_BASE_URL = 'https://graph.facebook.com';
 
 export class MetaAdsService {
   private accessToken: string;
