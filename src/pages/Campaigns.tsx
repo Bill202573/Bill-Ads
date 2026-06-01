@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useCampaigns } from '@/hooks/useCampaignData'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle, RefreshCw, Loader2 } from 'lucide-react'
+import { AlertCircle, RefreshCw, Loader2, Search } from 'lucide-react'
 import { SyncService } from '@/services/sync-service'
 
 export default function Campaigns() {
@@ -9,6 +9,11 @@ export default function Campaigns() {
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState('')
   const [syncSuccess, setSyncSuccess] = useState('')
+
+  // Filtros
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterPlatform, setFilterPlatform] = useState<'all' | 'meta' | 'google'>('all')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'paused' | 'archived'>('all')
 
   const handleSync = async () => {
     setSyncing(true)
@@ -29,6 +34,30 @@ export default function Campaigns() {
       setSyncing(false)
     }
   }
+
+  // Filtrar campanhas
+  const filteredCampaigns = useMemo(() => {
+    if (!campaigns) return []
+
+    return campaigns.filter(campaign => {
+      // Filtro de plataforma
+      if (filterPlatform !== 'all' && campaign.platform !== filterPlatform) {
+        return false
+      }
+
+      // Filtro de status
+      if (filterStatus !== 'all' && campaign.status !== filterStatus) {
+        return false
+      }
+
+      // Filtro de busca
+      if (searchTerm && !campaign.campaign_name.toLowerCase().includes(searchTerm.toLowerCase())) {
+        return false
+      }
+
+      return true
+    })
+  }, [campaigns, filterPlatform, filterStatus, searchTerm])
 
   if (isLoading) {
     return (
@@ -88,8 +117,53 @@ export default function Campaigns() {
             </button>
           </div>
         </CardHeader>
-        <CardContent>
-          {campaigns && campaigns.length > 0 ? (
+
+        {/* Filtros */}
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Busca */}
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Buscar por nome da campanha..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Filtro de Plataforma */}
+            <select
+              value={filterPlatform}
+              onChange={(e) => setFilterPlatform(e.target.value as any)}
+              className="px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Todas as plataformas</option>
+              <option value="meta">Meta Ads</option>
+              <option value="google">Google Ads</option>
+            </select>
+
+            {/* Filtro de Status */}
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as any)}
+              className="px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">Todos os status</option>
+              <option value="active">Ativa</option>
+              <option value="paused">Pausada</option>
+              <option value="archived">Arquivada</option>
+            </select>
+          </div>
+
+          {/* Resultado dos filtros */}
+          <p className="text-sm text-muted-foreground">
+            Mostrando <span className="font-medium">{filteredCampaigns.length}</span> de <span className="font-medium">{campaigns?.length || 0}</span> campanhas
+          </p>
+
+          {/* Tabela */}
+          {filteredCampaigns && filteredCampaigns.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -102,11 +176,11 @@ export default function Campaigns() {
                   </tr>
                 </thead>
                 <tbody>
-                  {campaigns.map(campaign => (
+                  {filteredCampaigns.map(campaign => (
                     <tr key={campaign.id} className="border-b border-border hover:bg-muted/50">
                       <td className="py-3 px-4 font-medium">{campaign.campaign_name}</td>
                       <td className="py-3 px-4 capitalize">
-                        {campaign.platform === 'meta' ? 'Meta Ads' : 'Google Ads'}
+                        {campaign.platform === 'meta' ? '📱 Meta Ads' : '🔍 Google Ads'}
                       </td>
                       <td className="py-3 px-4">
                         <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
@@ -120,10 +194,10 @@ export default function Campaigns() {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        {campaign.daily_budget ? `$${campaign.daily_budget.toFixed(2)}` : '-'}
+                        {campaign.daily_budget ? `R$ ${campaign.daily_budget.toFixed(2)}` : '-'}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">
-                        {campaign.synced_at ? new Date(campaign.synced_at).toLocaleDateString() : 'Nunca'}
+                        {campaign.synced_at ? new Date(campaign.synced_at).toLocaleDateString('pt-BR') : 'Nunca'}
                       </td>
                     </tr>
                   ))}
@@ -132,7 +206,9 @@ export default function Campaigns() {
             </div>
           ) : (
             <p className="text-center text-muted-foreground py-12">
-              Nenhuma campanha encontrada. Configure suas integrações em Configurações.
+              {campaigns && campaigns.length > 0
+                ? 'Nenhuma campanha encontrada com os filtros selecionados.'
+                : 'Nenhuma campanha sincronizada. Configure suas integrações em Configurações.'}
             </p>
           )}
         </CardContent>
