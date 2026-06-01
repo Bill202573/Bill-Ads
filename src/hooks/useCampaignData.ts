@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { SupabaseService } from '@/services/supabase-service';
-import { ClaudeInsightsService } from '@/services/claude-insights-service';
+import { OpenAIInsightsService } from '@/services/openai-insights-service';
 import { Campaign, DailyMetrics, CampaignInsight } from '@/types/ads';
 
 /**
@@ -60,11 +60,11 @@ export function useCampaignInsights(campaignId: string, unreadOnly: boolean = fa
 }
 
 /**
- * Hook to analyze campaign with Claude
+ * Hook to analyze campaign with OpenAI
  */
 export function useAnalyzeCampaign() {
   const queryClient = useQueryClient();
-  const claudeService = new ClaudeInsightsService();
+  const openaiService = new OpenAIInsightsService();
 
   return useMutation({
     mutationFn: async (campaignId: string) => {
@@ -75,7 +75,7 @@ export function useAnalyzeCampaign() {
       const metrics = await SupabaseService.getCampaignMetrics(campaignId);
       if (metrics.length === 0) throw new Error('No metrics available');
 
-      return claudeService.analyzePerformance({
+      return openaiService.analyzePerformance({
         campaign_name: campaign.campaign_name,
         platform: campaign.platform,
         metrics,
