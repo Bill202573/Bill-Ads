@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { BarChart3, Settings, Home } from 'lucide-react'
+import { BarChart3, Settings, Home, Zap } from 'lucide-react'
 
 interface LayoutProps {
   children: ReactNode
@@ -46,6 +46,18 @@ export default function Layout({ children }: LayoutProps) {
           </Link>
 
           <Link
+            to="/insights"
+            className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
+              isActive('/insights')
+                ? 'bg-primary text-primary-foreground'
+                : 'text-foreground hover:bg-muted'
+            }`}
+          >
+            <Zap className="w-4 h-4" />
+            Insights & IA
+          </Link>
+
+          <Link
             to="/settings"
             className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
               isActive('/settings')
@@ -67,6 +79,7 @@ export default function Layout({ children }: LayoutProps) {
             <h2 className="text-xl font-semibold text-foreground">
               {location.pathname === '/' && 'Dashboard'}
               {location.pathname === '/campaigns' && 'Campanhas'}
+              {location.pathname === '/insights' && 'Insights & Análises'}
               {location.pathname === '/settings' && 'Configurações'}
             </h2>
           </div>

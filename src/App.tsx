@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Campaigns from './pages/Campaigns'
+import Insights from './pages/Insights'
 import Settings from './pages/Settings'
 import LoginForm from './components/auth/LoginForm'
 
@@ -39,6 +40,7 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/campaigns" element={<Campaigns />} />
+          <Route path="/insights" element={<Insights />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
