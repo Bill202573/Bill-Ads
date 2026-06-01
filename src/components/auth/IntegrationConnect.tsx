@@ -29,6 +29,9 @@ export default function IntegrationConnect({ onConnected }: IntegrationConnectPr
   const [googleCustomerId, setGoogleCustomerId] = useState('')
   const [syncingId, setSyncingId] = useState<string | null>(null)
   const [syncMessage, setSyncMessage] = useState('')
+  const [metaAccounts, setMetaAccounts] = useState<any[]>([])
+  const [selectedMetaAccount, setSelectedMetaAccount] = useState('')
+  const [loadingAccounts, setLoadingAccounts] = useState(false)
 
   const loadIntegrations = async () => {
     try {
@@ -81,12 +84,14 @@ export default function IntegrationConnect({ onConnected }: IntegrationConnectPr
     loadIntegrations()
   }, [])
 
-  const connectMeta = async () => {
-    setLoading(true)
+  const loadMetaAccounts = async (token: string) => {
+    setLoadingAccounts(true)
     setError('')
+    setMetaAccounts([])
+    setSelectedMetaAccount('')
 
     try {
-      const metaService = new MetaAdsService(metaToken)
+      const metaService = new MetaAdsService(token)
       const validation = await metaService.validateToken()
 
       if (!validation.success) {
@@ -96,11 +101,38 @@ export default function IntegrationConnect({ onConnected }: IntegrationConnectPr
 
       const accounts = await metaService.getAdAccounts()
       if (!accounts.success || !accounts.data || accounts.data.length === 0) {
-        setError('Nenhuma conta Meta encontrada')
+        setError('Nenhuma conta Meta encontrada para este token')
         return
       }
 
-      const account = accounts.data[0]
+      setMetaAccounts(accounts.data)
+      setSelectedMetaAccount(accounts.data[0].id)
+    } catch (err) {
+      setError('Erro ao carregar contas: ' + String(err))
+    } finally {
+      setLoadingAccounts(false)
+    }
+  }
+
+  const connectMeta = async () => {
+    setLoading(true)
+    setError('')
+
+    try {
+      if (!selectedMetaAccount) {
+        setError('Selecione uma conta Meta')
+        return
+      }
+
+      const metaService = new MetaAdsService(metaToken)
+      const accounts = await metaService.getAdAccounts()
+
+      if (!accounts.success || !accounts.data) {
+        setError('Erro ao obter contas Meta')
+        return
+      }
+
+      const account = accounts.data.find((a: any) => a.id === selectedMetaAccount)
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
@@ -278,7 +310,11 @@ export default function IntegrationConnect({ onConnected }: IntegrationConnectPr
                 <input
                   type="password"
                   value={metaToken}
-                  onChange={(e) => setMetaToken(e.target.value)}
+                  onChange={(e) => {
+                    setMetaToken(e.target.value)
+                    setMetaAccounts([])
+                    setSelectedMetaAccount('')
+                  }}
                   placeholder="Cole seu access token do Meta"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
@@ -286,17 +322,61 @@ export default function IntegrationConnect({ onConnected }: IntegrationConnectPr
                   Obtenha em: Meta App &gt; Marketing API &gt; Tools
                 </p>
               </div>
+
+              {metaToken && !metaAccounts.length && (
+                <button
+                  onClick={() => loadMetaAccounts(metaToken)}
+                  disabled={loadingAccounts}
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+                >
+                  {loadingAccounts ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Carregando contas...
+                    </>
+                  ) : (
+                    'Carregar Contas Meta'
+                  )}
+                </button>
+              )}
+
+              {metaAccounts.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">Selecione a Conta Meta</label>
+                  <select
+                    value={selectedMetaAccount}
+                    onChange={(e) => setSelectedMetaAccount(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="">-- Escolha uma conta --</option>
+                    {metaAccounts.map((account: any) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name} (ID: {account.id})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Escolha qual conta Meta você deseja sincronizar
+                  </p>
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <button
                   onClick={connectMeta}
-                  disabled={loading || !metaToken}
+                  disabled={loading || !metaToken || !selectedMetaAccount}
                   className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                   Conectar
                 </button>
                 <button
-                  onClick={() => setShowMetaForm(false)}
+                  onClick={() => {
+                    setShowMetaForm(false)
+                    setMetaToken('')
+                    setMetaAccounts([])
+                    setSelectedMetaAccount('')
+                  }}
                   className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition-colors"
                 >
                   Cancelar
