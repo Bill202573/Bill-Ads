@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useCampaigns } from '@/hooks/useCampaignData'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle, Loader2, Zap, TrendingUp, TrendingDown, Target } from 'lucide-react'
+import { AlertCircle, Loader2, Zap, TrendingUp, TrendingDown, Target, CheckCircle2 } from 'lucide-react'
 import { OpenAIInsightsService } from '@/services/openai-insights-service'
 import { SupabaseService } from '@/services/supabase-service'
+
+interface CampaignWithAccount {
+  campaign: any
+  accountName: string
+}
 
 interface CampaignAnalysis {
   campaignId: string
   campaignName: string
+  accountName: string
   platform: string
   insights: any[]
   score: number
@@ -17,19 +23,65 @@ interface CampaignAnalysis {
 
 export default function Insights() {
   const { data: campaigns, isLoading } = useCampaigns()
+  const [integrations, setIntegrations] = useState<any[]>([])
   const [analyses, setAnalyses] = useState<CampaignAnalysis[]>([])
   const [analyzing, setAnalyzing] = useState(false)
-  const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null)
+  const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set())
 
-  const analyzeAllCampaigns = async () => {
-    if (!campaigns || campaigns.length === 0) return
+  // Carregar integrações para saber nomes das contas
+  useEffect(() => {
+    const loadIntegrations = async () => {
+      try {
+        const { data: { user } } = await SupabaseService.supabase.auth.getUser()
+        if (user) {
+          const { data } = await SupabaseService.supabase
+            .from('integrations')
+            .select('*')
+            .eq('user_id', user.id)
+          setIntegrations(data || [])
+        }
+      } catch (error) {
+        console.error('Error loading integrations:', error)
+      }
+    }
+    loadIntegrations()
+  }, [])
+
+  const getAccountName = (platform: string, campaignId: string) => {
+    const integration = integrations.find(i => i.platform === platform)
+    return integration?.platform_account_name || 'Conta Desconhecida'
+  }
+
+  const toggleCampaignSelection = (campaignId: string) => {
+    const newSelected = new Set(selectedCampaigns)
+    if (newSelected.has(campaignId)) {
+      newSelected.delete(campaignId)
+    } else {
+      newSelected.add(campaignId)
+    }
+    setSelectedCampaigns(newSelected)
+  }
+
+  const toggleSelectAll = () => {
+    if (!campaigns) return
+    if (selectedCampaigns.size === campaigns.length) {
+      setSelectedCampaigns(new Set())
+    } else {
+      setSelectedCampaigns(new Set(campaigns.map(c => c.id)))
+    }
+  }
+
+  const analyzeSelectedCampaigns = async () => {
+    if (selectedCampaigns.size === 0 || !campaigns) return
 
     setAnalyzing(true)
     const openaiService = new OpenAIInsightsService()
 
-    const newAnalyses: CampaignAnalysis[] = campaigns.map(campaign => ({
+    const campaignsToAnalyze = campaigns.filter(c => selectedCampaigns.has(c.id))
+    const newAnalyses: CampaignAnalysis[] = campaignsToAnalyze.map(campaign => ({
       campaignId: campaign.id,
       campaignName: campaign.campaign_name,
+      accountName: getAccountName(campaign.platform, campaign.id),
       platform: campaign.platform,
       insights: [],
       score: 0,
@@ -38,10 +90,10 @@ export default function Insights() {
 
     setAnalyses(newAnalyses)
 
-    // Analisar cada campanha
-    for (let i = 0; i < campaigns.length; i++) {
-      const campaign = campaigns[i]
-      const analysisIndex = i
+    // Analisar cada campanha selecionada
+    for (let i = 0; i < campaignsToAnalyze.length; i++) {
+      const campaign = campaignsToAnalyze[i]
+      const analysisIndex = newAnalyses.findIndex(a => a.campaignId === campaign.id)
 
       try {
         // Buscar métricas da campanha
@@ -104,33 +156,97 @@ export default function Insights() {
 
   return (
     <div className="space-y-6">
-      {/* Header com botão de análise */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Insights & Análises</h1>
-          <p className="text-muted-foreground mt-1">IA analisando performance de suas campanhas</p>
-        </div>
-        <button
-          onClick={analyzeAllCampaigns}
-          disabled={analyzing || !campaigns || campaigns.length === 0}
-          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 font-medium"
-        >
-          {analyzing ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Analisando...
-            </>
-          ) : (
-            <>
-              <Zap className="w-5 h-5" />
-              Analisar Todas as Campanhas
-            </>
-          )}
-        </button>
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold">Insights & Análises</h1>
+        <p className="text-muted-foreground mt-1">IA analisando performance de suas campanhas</p>
       </div>
 
+      {/* Seleção de Campanhas */}
+      {!analyzing && campaigns && campaigns.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Selecione Campanhas para Analisar</CardTitle>
+            <CardDescription>Escolha quais campanhas deseja analisar com IA</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Selecionar Todas */}
+            <div className="flex items-center gap-2 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
+              <input
+                type="checkbox"
+                id="select-all"
+                checked={selectedCampaigns.size === campaigns.length}
+                onChange={toggleSelectAll}
+                className="w-4 h-4 cursor-pointer"
+              />
+              <label htmlFor="select-all" className="flex-1 cursor-pointer font-medium">
+                Selecionar Todas as Campanhas ({campaigns.length})
+              </label>
+              <span className="text-sm text-muted-foreground">
+                {selectedCampaigns.size} selecionadas
+              </span>
+            </div>
+
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {campaigns.map(campaign => (
+                <div
+                  key={campaign.id}
+                  className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
+                  onClick={() => toggleCampaignSelection(campaign.id)}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedCampaigns.has(campaign.id)}
+                    onChange={() => {}}
+                    className="w-4 h-4 cursor-pointer"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{campaign.campaign_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {getAccountName(campaign.platform, campaign.id)} • {campaign.platform === 'meta' ? '📱 Meta Ads' : '🔍 Google Ads'}
+                    </p>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded ${
+                    campaign.status === 'active'
+                      ? 'bg-green-500/20 text-green-700'
+                      : 'bg-gray-500/20 text-gray-700'
+                  }`}>
+                    {campaign.status === 'active' ? 'Ativa' : campaign.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Botão Analisar */}
+            <button
+              onClick={analyzeSelectedCampaigns}
+              disabled={selectedCampaigns.size === 0}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 font-medium"
+            >
+              {selectedCampaigns.size === 0 ? (
+                <>Selecione campanhas para analisar</>
+              ) : (
+                <>
+                  <Zap className="w-5 h-5" />
+                  Analisar {selectedCampaigns.size} Campanha{selectedCampaigns.size > 1 ? 's' : ''}
+                </>
+              )}
+            </button>
+          </CardContent>
+        </Card>
+      )}
+
+      {analyzing && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="pt-6 flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            <p className="text-sm text-blue-700 font-medium">Analisando {selectedCampaigns.size} campanha(s) com IA...</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Resumo geral */}
-      {analyses.length > 0 && (
+      {analyses.length > 0 && !analyzing && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-2">
@@ -180,7 +296,9 @@ export default function Insights() {
                 <div className="flex items-center gap-4">
                   <div>
                     <CardTitle className="text-lg">{analysis.campaignName}</CardTitle>
-                    <CardDescription>{analysis.platform === 'meta' ? '📱 Meta Ads' : '🔍 Google Ads'}</CardDescription>
+                    <CardDescription>
+                      {analysis.accountName} • {analysis.platform === 'meta' ? '📱 Meta Ads' : '🔍 Google Ads'}
+                    </CardDescription>
                   </div>
                   <div className="text-right">
                     <div className="text-3xl font-bold text-blue-600">{analysis.score}%</div>
